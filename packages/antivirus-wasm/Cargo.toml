@@ -1,0 +1,8 @@
+[package]
+name = "antivirus-wasm"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+micromail-sdk = { path = "../../sdk/rust/micromail-sdk" }
+serde = { version = "1.0", features = ["derive"] }

@@ -1,0 +1,161 @@
+name: Build Addons & Publish to Registry
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*.*.*'
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v1.0.0)'
+        required: false
+        default: ''
+        type: string
+      branch:
+        description: 'Branch or Git ref to build from'
+        required: false
+        default: 'main'
+        type: string
+
+jobs:
+  build-and-package:
+    name: Build & Package Addons
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prepare dist directory
+        run: mkdir -p dist-zips
+
+      # 1. Build Rust WASM Addons (antivirus-wasm, spam-bayes-wasm)
+      - name: Build Antivirus Addon (WASM)
+        run: |
+          cd packages/antivirus-wasm
+          cargo build --target wasm32-wasip1 --release
+          cp target/wasm32-wasip1/release/antivirus_wasm.wasm backend.wasm
+          zip -j ../../dist-zips/antivirus-wasm.zip addon.json backend.wasm
+          cd ../..
+          sha256sum dist-zips/antivirus-wasm.zip | awk '{print $1}' > dist-zips/antivirus-wasm.zip.sha256
+
+      - name: Build Spam Filter Addon (WASM)
+        run: |
+          cd packages/spam-bayes-wasm
+          cargo build --target wasm32-wasip1 --release
+          cp target/wasm32-wasip1/release/spam_bayes_wasm.wasm backend.wasm
+          zip -j ../../dist-zips/spam-bayes-wasm.zip addon.json backend.wasm
+          cd ../..
+          sha256sum dist-zips/spam-bayes-wasm.zip | awk '{print $1}' > dist-zips/spam-bayes-wasm.zip.sha256
+
+      # 2. Package Frontend/WASM Addons (voice-search-wasm)
+      - name: Package Voice Search Addon
+        run: |
+          cd packages/voice-search-wasm
+          zip -r ../../dist-zips/voice-search-wasm.zip addon.json ui/
+          cd ../..
+          sha256sum dist-zips/voice-search-wasm.zip | awk '{print $1}' > dist-zips/voice-search-wasm.zip.sha256
+
+      - name: Upload Built Addon Zips
+        uses: actions/upload-artifact@v4
+        with:
+          name: addon-zips
+          path: dist-zips/*
+          if-no-files-found: error
+
+  publish-addons-release:
+    name: Publish GitHub Release & Update Registry
+    needs: build-and-package
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout addons repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Download Built Addons
+        uses: actions/download-artifact@v4
+        with:
+          name: addon-zips
+          path: dist-zips
+
+      - name: Determine Release Tag
+        id: release_tag
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG="${{ github.event.inputs.version }}"
+            [[ $TAG != v* ]] && TAG="v$TAG"
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v0.0.0-${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      # 1. Publish GitHub Release in this Addons repo
+      - name: Create or Update Addons GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          name: "MicroMail Addons ${{ steps.release_tag.outputs.tag }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            dist-zips/*.zip
+            dist-zips/*.sha256
+
+      # 2. Check out the Registry repository (using REGISTRY_TOKEN secret)
+      - name: Checkout Registry Repository
+        if: env.REGISTRY_TOKEN != ''
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        uses: actions/checkout@v4
+        with:
+          repository: MicroMail-Group/Registry
+          token: ${{ secrets.REGISTRY_TOKEN }}
+          path: registry-repo
+          ref: master
+
+      # 3. Update registry.json with Python script
+      - name: Update registry.json
+        if: env.REGISTRY_TOKEN != ''
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          python3 scripts/update_registry.py registry-repo/registry.json "${{ steps.release_tag.outputs.tag }}" "${{ github.repository_owner }}" "${{ github.event.repository.name }}"
+
+      # 4. Commit and push updated registry.json to Registry repository
+      - name: Commit & Push to Registry Repo
+        if: env.REGISTRY_TOKEN != ''
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          cd registry-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add registry.json
+          git commit -m "chore(registry): update addons catalog for ${{ steps.release_tag.outputs.tag }}" || echo "No changes to commit"
+          git push origin master

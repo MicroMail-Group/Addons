@@ -1,0 +1,17 @@
+{
+  "id": "official.antivirus",
+  "name": "WASM Anti-Virus & Threat Scanner",
+  "version": "1.0.0",
+  "runtime": "backend",
+  "description": "Scans attachments and email contents for malware signatures, dangerous executable payloads, and EICAR threats.",
+  "permissions": ["hook:on_inbound_pre_store", "fs:read_attachment"],
+  "backend": {
+    "wasm": "backend.wasm",
+    "hooks": ["on_inbound_pre_store"],
+    "timeout_ms": 1500
+  },
+  "config_schema": [
+    { "key": "block_executables", "type": "boolean", "default": true, "label": "Block Executable Attachments (.exe, .bat, .scr, .vbs)" },
+    { "key": "action_on_threat", "type": "select", "options": ["reject", "spam"], "default": "reject", "label": "Action on Threat Detected" }
+  ]
+}

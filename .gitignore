@@ -1,0 +1,25 @@
+# ========================================================
+# MicroMail Addons .gitignore
+# ========================================================
+
+# Compiled WASM & Binaries
+target/
+**/target/
+*.wasm
+*.zip
+
+# Node / JS artifacts
+node_modules/
+**/node_modules/
+dist/
+
+# Rust artifacts
+*.lock
+**/*.lock
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log

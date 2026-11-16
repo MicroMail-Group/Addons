@@ -1,0 +1,16 @@
+{
+  "id": "official.spam-filter",
+  "name": "Heuristic & DNSBL Spam Filter",
+  "version": "1.0.0",
+  "runtime": "backend",
+  "description": "Scores inbound emails in-container via WebAssembly before inbox delivery.",
+  "permissions": ["hook:on_inbound_pre_store", "net:dns"],
+  "backend": {
+    "wasm": "backend.wasm",
+    "hooks": ["on_inbound_pre_store"],
+    "timeout_ms": 1500
+  },
+  "config_schema": [
+    { "key": "threshold", "type": "number", "default": 0.75, "label": "Spam Quarantine Threshold" }
+  ]
+}
