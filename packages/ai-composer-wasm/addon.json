@@ -1,9 +1,9 @@
 {
   "id": "official.ai-composer",
-  "name": "AI Email Composer (Local WASM)",
+  "name": "Smart Email Composer (Local Transformers & WASM)",
   "version": "1.0.0",
   "runtime": "frontend",
-  "description": "Compose and refine emails from prompts using a lightweight 69 KB WASM engine running 100% locally in your browser.",
+  "description": "Compose and polish emails using client-side Transformers.js neural models and lightweight WASM running 100% in your browser.",
   "permissions": ["ui:compose_actions", "compose:insert_text"],
   "frontend": {
     "entry": "ui/index.js",
@@ -11,6 +11,13 @@
     "requires_coop_coep": false
   },
   "config_schema": [
+    {
+      "key": "engine",
+      "type": "select",
+      "options": ["Transformers.js (Neural SLM)", "Fast Local WASM"],
+      "default": "Transformers.js (Neural SLM)",
+      "label": "Inference Engine"
+    },
     {
       "key": "default_tone",
       "type": "select",
