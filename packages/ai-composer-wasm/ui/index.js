@@ -423,8 +423,15 @@ export default {
               },
             ];
 
+            const tokenLimits = {
+              Concise: 256,
+              Standard: 512,
+              Detailed: 800,
+            };
+            const maxTokens = tokenLimits[length] || 512;
+
             const out = await neuralPipe(messages, {
-              max_new_tokens: 220,
+              max_new_tokens: maxTokens,
               temperature: 0.7,
             });
 
