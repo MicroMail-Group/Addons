@@ -6,6 +6,7 @@
 target/
 **/target/
 *.wasm
+!packages/**/ui/*.wasm
 *.zip
 
 # Node / JS artifacts

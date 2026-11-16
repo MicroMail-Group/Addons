@@ -37,7 +37,7 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-wasip1
+          targets: wasm32-wasip1, wasm32-unknown-unknown
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -75,6 +75,17 @@ jobs:
           zip -r ../../dist-zips/voice-search-wasm.zip addon.json ui/
           cd ../..
           sha256sum dist-zips/voice-search-wasm.zip | awk '{print $1}' > dist-zips/voice-search-wasm.zip.sha256
+
+      # 3. Build & Package AI Composer Addon (Local WASM)
+      - name: Build & Package AI Composer Addon (Local WASM)
+        run: |
+          cd packages/ai-composer-wasm
+          cargo build --target wasm32-unknown-unknown --release
+          WASM_FILE=$(find target/wasm32-unknown-unknown/release -maxdepth 1 -name "*.wasm" | head -n 1)
+          cp "$WASM_FILE" ui/generator.wasm
+          zip -r ../../dist-zips/ai-composer-wasm.zip addon.json ui/
+          cd ../..
+          sha256sum dist-zips/ai-composer-wasm.zip | awk '{print $1}' > dist-zips/ai-composer-wasm.zip.sha256
 
       - name: Upload Built Addon Zips
         uses: actions/upload-artifact@v4

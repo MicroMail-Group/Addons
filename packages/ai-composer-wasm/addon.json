@@ -1,0 +1,29 @@
+{
+  "id": "official.ai-composer",
+  "name": "AI Email Composer (Local WASM)",
+  "version": "1.0.0",
+  "runtime": "frontend",
+  "description": "Compose and refine emails from prompts using a lightweight 69 KB WASM engine running 100% locally in your browser.",
+  "permissions": ["ui:compose_actions", "compose:insert_text"],
+  "frontend": {
+    "entry": "ui/index.js",
+    "slots": ["compose_actions"],
+    "requires_coop_coep": false
+  },
+  "config_schema": [
+    {
+      "key": "default_tone",
+      "type": "select",
+      "options": ["Professional", "Friendly", "Concise", "Urgent", "Formal", "Casual"],
+      "default": "Professional",
+      "label": "Default Tone"
+    },
+    {
+      "key": "default_length",
+      "type": "select",
+      "options": ["Standard", "Concise", "Detailed"],
+      "default": "Standard",
+      "label": "Default Length"
+    }
+  ]
+}
