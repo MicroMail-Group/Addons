@@ -52,7 +52,8 @@ jobs:
         run: |
           cd packages/antivirus-wasm
           cargo build --target wasm32-wasip1 --release
-          cp target/wasm32-wasip1/release/antivirus_wasm.wasm backend.wasm
+          WASM_FILE=$(find target/wasm32-wasip1/release -maxdepth 1 -name "*.wasm" | head -n 1)
+          cp "$WASM_FILE" backend.wasm
           zip -j ../../dist-zips/antivirus-wasm.zip addon.json backend.wasm
           cd ../..
           sha256sum dist-zips/antivirus-wasm.zip | awk '{print $1}' > dist-zips/antivirus-wasm.zip.sha256
@@ -61,7 +62,8 @@ jobs:
         run: |
           cd packages/spam-bayes-wasm
           cargo build --target wasm32-wasip1 --release
-          cp target/wasm32-wasip1/release/spam_bayes_wasm.wasm backend.wasm
+          WASM_FILE=$(find target/wasm32-wasip1/release -maxdepth 1 -name "*.wasm" | head -n 1)
+          cp "$WASM_FILE" backend.wasm
           zip -j ../../dist-zips/spam-bayes-wasm.zip addon.json backend.wasm
           cd ../..
           sha256sum dist-zips/spam-bayes-wasm.zip | awk '{print $1}' > dist-zips/spam-bayes-wasm.zip.sha256
