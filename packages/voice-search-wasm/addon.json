@@ -1,13 +1,13 @@
 {
   "id": "official.voice-search",
-  "name": "Offline Voice Search (WASM)",
-  "version": "1.0.0",
+  "name": "Offline Voice Actions (WASM)",
+  "version": "1.1.0",
   "runtime": "frontend",
-  "description": "Search your inbox by voice using an embedded 13 MB local WASM speech model.",
-  "permissions": ["ui:search_bar", "ui:set_search_query"],
+  "description": "Voice search your inbox and dictate emails using speech recognition or embedded local WASM speech model.",
+  "permissions": ["ui:search_bar", "ui:set_search_query", "ui:compose_actions", "compose:insert_text"],
   "frontend": {
     "entry": "ui/index.js",
-    "slots": ["search_bar_action"],
+    "slots": ["search_bar_action", "compose_actions"],
     "requires_coop_coep": false
   },
   "config_schema": [
