@@ -42,8 +42,11 @@ export default {
 
         env.allowLocalModels = false;
 
-        // SmolLM2-135M-Instruct quantized q4 (~80MB)
-        const modelId = "HuggingFaceTB/SmolLM2-135M-Instruct";
+        // Select neural model: Qwen 2.5 0.5B (default) or SmolLM2 135M
+        const modelId = sdk.config?.model?.includes("SmolLM2")
+          ? "HuggingFaceTB/SmolLM2-135M-Instruct"
+          : "onnx-community/Qwen2.5-0.5B-Instruct";
+
         transformersPipeline = await pipeline("text-generation", modelId, {
           dtype: "q4",
           progress_callback: (p) => {
@@ -411,28 +414,46 @@ export default {
           }
 
           if (neuralPipe) {
+            const lengthGuides = {
+              Concise: "Length: Exactly 1 to 2 short sentences. Be brief and to the point. Stop immediately after.",
+              Standard: "Length: 2 to 3 standard paragraphs with greeting and signoff.",
+              Detailed: "Length: Detailed email with context, bullet points, and next steps.",
+            };
+
+            const toneGuides = {
+              Professional: "Tone: Professional and courteous.",
+              Friendly: "Tone: Warm, friendly, and appreciative.",
+              Concise: "Tone: Direct, clear, and brief.",
+              Urgent: "Tone: Urgent with immediate call to action.",
+              Formal: "Tone: Formal and respectful.",
+              Casual: "Tone: Casual, relaxed, and conversational.",
+            };
+
             const messages = [
               {
                 role: "system",
                 content:
-                  "You are a helpful assistant that writes clear, professional, and well-structured email messages. Output only the email text with greeting, body, and signoff.",
+                  "You are a helpful email writing assistant. Write a clean email draft based on the user's instructions. Strictly observe the length constraint. Never repeat sentences or phrases. Once complete, stop immediately.",
               },
               {
                 role: "user",
-                content: `Tone: ${tone}. Length style: ${length}.\nInstructions: ${prompt}`,
+                content: `${toneGuides[tone] || ""}\n${lengthGuides[length] || ""}\nDraft an email responding to: ${prompt}`,
               },
             ];
 
             const tokenLimits = {
-              Concise: 256,
-              Standard: 512,
-              Detailed: 800,
+              Concise: 90,
+              Standard: 320,
+              Detailed: 550,
             };
-            const maxTokens = tokenLimits[length] || 512;
+            const maxTokens = tokenLimits[length] || 320;
 
             const out = await neuralPipe(messages, {
               max_new_tokens: maxTokens,
-              temperature: 0.7,
+              temperature: 0.6,
+              top_p: 0.9,
+              repetition_penalty: 1.25,
+              do_sample: true,
             });
 
             if (out && out[0] && out[0].generated_text) {
@@ -442,6 +463,24 @@ export default {
               } else if (typeof res === "string") {
                 generated = res;
               }
+            }
+
+            // Loop detector: trim if the model ever repeats any sentence
+            if (generated) {
+              const rawSentences = generated.split(/(?<=[.?!])\s+/);
+              const seen = new Set();
+              const deduped = [];
+              for (const raw of rawSentences) {
+                const s = raw.trim();
+                if (!s) continue;
+                const normalized = s.toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (seen.has(normalized)) {
+                  break; // Repetition loop detected, cut off right here
+                }
+                seen.add(normalized);
+                deduped.push(s);
+              }
+              generated = deduped.join(" ");
             }
           }
 

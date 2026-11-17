@@ -12,6 +12,13 @@
   },
   "config_schema": [
     {
+      "key": "model",
+      "type": "select",
+      "options": ["Qwen 2.5 (0.5B - Recommended, Smarter)", "SmolLM2 (135M - Ultra Lightweight)"],
+      "default": "Qwen 2.5 (0.5B - Recommended, Smarter)",
+      "label": "Neural Model"
+    },
+    {
       "key": "engine",
       "type": "select",
       "options": ["Transformers.js (Neural SLM)", "Fast Local WASM"],
