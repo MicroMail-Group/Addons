@@ -46,10 +46,19 @@ def main():
 
         download_url = f"https://github.com/{repo_owner}/{repo_name}/releases/download/{release_tag}/{item}.zip"
 
+        # Sync version to the release tag (e.g. v1.0.4 -> 1.0.4) so registry reflects the new release
+        clean_tag_ver = release_tag.lstrip("v")
+        if clean_tag_ver and not clean_tag_ver.startswith("0.0.0-"):
+            addon_version = clean_tag_ver
+        else:
+            addon_version = manifest.get("version", "1.0.0")
+
+        manifest["version"] = addon_version
+
         addon_entry = {
             "id": manifest.get("id"),
             "name": manifest.get("name"),
-            "version": manifest.get("version"),
+            "version": addon_version,
             "runtime": manifest.get("runtime", "backend"),
             "description": manifest.get("description", ""),
             "download_url": download_url,
@@ -58,7 +67,7 @@ def main():
         }
 
         existing[manifest["id"]] = addon_entry
-        print(f"Registered addon: {manifest['id']} (v{manifest['version']})")
+        print(f"Registered addon: {manifest['id']} (v{addon_version})")
 
     registry_data["addons"] = list(existing.values())
 

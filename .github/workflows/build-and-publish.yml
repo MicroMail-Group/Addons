@@ -47,6 +47,33 @@ jobs:
       - name: Prepare dist directory
         run: mkdir -p dist-zips
 
+      - name: Sync Addon Versions to Release Tag
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG=""
+          fi
+
+          CLEAN_VER="${TAG#v}"
+          if [ -n "$CLEAN_VER" ]; then
+            echo "Syncing all addon.json versions to release version: $CLEAN_VER"
+            for f in packages/*/addon.json; do
+              if [ -f "$f" ]; then
+                python3 -c "
+import json
+with open('$f', 'r') as fp:
+    d = json.load(fp)
+d['version'] = '$CLEAN_VER'
+with open('$f', 'w') as fp:
+    json.dump(d, fp, indent=2)
+"
+              fi
+            done
+          fi
+
       # 1. Build Rust WASM Addons (antivirus-wasm, spam-bayes-wasm)
       - name: Build Antivirus Addon (WASM)
         run: |
@@ -168,3 +195,4 @@ jobs:
           git add registry.json
           git commit -m "Update addons catalog for ${{ steps.release_tag.outputs.tag }}" || echo "No changes to commit"
           git push origin master
+          curl -s "https://purge.jsdelivr.net/gh/MicroMail-Group/Registry@master/registry.json" || true
