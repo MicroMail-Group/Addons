@@ -1,17 +1,41 @@
 {
   "id": "official.voice-search",
   "name": "Offline Voice Actions (WASM)",
-  "version": "1.1.0",
+  "version": "1.0.4",
   "runtime": "frontend",
   "description": "Voice search your inbox and dictate emails using speech recognition or embedded local WASM speech model.",
-  "permissions": ["ui:search_bar", "ui:set_search_query", "ui:compose_actions", "compose:insert_text"],
+  "permissions": [
+    "ui:search_bar",
+    "ui:set_search_query",
+    "ui:compose_actions",
+    "compose:insert_text"
+  ],
   "frontend": {
     "entry": "ui/index.js",
-    "slots": ["search_bar_action", "compose_actions"],
+    "slots": [
+      "search_bar_action",
+      "compose_actions"
+    ],
     "requires_coop_coep": false
   },
   "config_schema": [
-    { "key": "language", "type": "select", "options": ["en", "es", "fr", "de"], "default": "en", "label": "Language" },
-    { "key": "auto_submit", "type": "boolean", "default": true, "label": "Submit search automatically" }
+    {
+      "key": "language",
+      "type": "select",
+      "options": [
+        "en",
+        "es",
+        "fr",
+        "de"
+      ],
+      "default": "en",
+      "label": "Language"
+    },
+    {
+      "key": "auto_submit",
+      "type": "boolean",
+      "default": true,
+      "label": "Submit search automatically"
+    }
   ]
 }

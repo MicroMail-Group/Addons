@@ -57,25 +57,12 @@ jobs:
             TAG=""
           fi
 
-          CLEAN_VER="${TAG#v}"
-          if [ -n "$CLEAN_VER" ]; then
-            echo "Syncing all addon.json versions to release version: $CLEAN_VER"
-            for f in packages/*/addon.json; do
-              if [ -f "$f" ]; then
-                python3 -c "
-import json
-with open('$f', 'r') as fp:
-    d = json.load(fp)
-d['version'] = '$CLEAN_VER'
-with open('$f', 'w') as fp:
-    json.dump(d, fp, indent=2)
-"
-              fi
-            done
+          if [ -n "$TAG" ]; then
+            python3 scripts/sync_versions.py "$TAG"
           fi
 
       # 1. Build Rust WASM Addons (antivirus-wasm, spam-bayes-wasm)
-      - name: Build Antivirus Addon (WASM)
+      - name: Build Antivirus Addon
         run: |
           cd packages/antivirus-wasm
           cargo build --target wasm32-wasip1 --release

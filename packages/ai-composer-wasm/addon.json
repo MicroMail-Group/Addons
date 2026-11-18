@@ -1,41 +1,63 @@
 {
   "id": "official.ai-composer",
   "name": "Smart Email Composer (Local Transformers & WASM)",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "runtime": "frontend",
   "description": "Compose and polish emails using client-side Transformers.js neural models and lightweight WASM running 100% in your browser.",
-  "permissions": ["ui:compose_actions", "compose:insert_text"],
+  "permissions": [
+    "ui:compose_actions",
+    "compose:insert_text"
+  ],
   "frontend": {
     "entry": "ui/index.js",
-    "slots": ["compose_actions"],
+    "slots": [
+      "compose_actions"
+    ],
     "requires_coop_coep": false
   },
   "config_schema": [
     {
       "key": "model",
       "type": "select",
-      "options": ["Qwen 2.5 (0.5B - Recommended, Smarter)", "SmolLM2 (135M - Ultra Lightweight)"],
+      "options": [
+        "Qwen 2.5 (0.5B - Recommended, Smarter)",
+        "SmolLM2 (135M - Ultra Lightweight)"
+      ],
       "default": "Qwen 2.5 (0.5B - Recommended, Smarter)",
       "label": "Neural Model"
     },
     {
       "key": "engine",
       "type": "select",
-      "options": ["Transformers.js (Neural SLM)", "Fast Local WASM"],
+      "options": [
+        "Transformers.js (Neural SLM)",
+        "Fast Local WASM"
+      ],
       "default": "Transformers.js (Neural SLM)",
       "label": "Inference Engine"
     },
     {
       "key": "default_tone",
       "type": "select",
-      "options": ["Professional", "Friendly", "Concise", "Urgent", "Formal", "Casual"],
+      "options": [
+        "Professional",
+        "Friendly",
+        "Concise",
+        "Urgent",
+        "Formal",
+        "Casual"
+      ],
       "default": "Professional",
       "label": "Default Tone"
     },
     {
       "key": "default_length",
       "type": "select",
-      "options": ["Standard", "Concise", "Detailed"],
+      "options": [
+        "Standard",
+        "Concise",
+        "Detailed"
+      ],
       "default": "Standard",
       "label": "Default Length"
     }
