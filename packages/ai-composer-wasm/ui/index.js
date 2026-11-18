@@ -141,8 +141,46 @@ export default {
 
     function fallbackSynthesis(prompt, toneCode, lengthCode) {
       const p = prompt.trim();
-      const isUrgent = toneCode === 3;
+      const pLower = p.toLowerCase();
       const isFriendly = toneCode === 1 || toneCode === 5;
+      const isConcise = lengthCode === 1 || toneCode === 2;
+
+      // Detect compliment / gratitude response (e.g. "you did great", "thank you", "good job")
+      if (
+        pLower.includes("great") ||
+        pLower.includes("good job") ||
+        pLower.includes("thank") ||
+        pLower.includes("awesome") ||
+        pLower.includes("kudos") ||
+        pLower.includes("well done")
+      ) {
+        if (isConcise) {
+          return isFriendly
+            ? "Thanks so much, really appreciate the kind words!"
+            : "Thank you, I appreciate the positive feedback!";
+        }
+        return isFriendly
+          ? "Hi there,\n\nThanks so much for the kind words! It was great working on this, and I really appreciate your support.\n\nWarmly,"
+          : "Hello,\n\nThank you for reaching out and sharing the positive feedback. I appreciate your support.\n\nBest regards,";
+      }
+
+      // Detect meeting intent
+      if (pLower.includes("meet") || pLower.includes("sync") || pLower.includes("schedule") || pLower.includes("call")) {
+        if (isConcise) {
+          return isFriendly
+            ? "Would you be free for a quick chat later this week? Let me know what time works best for you!"
+            : "Could we schedule a brief sync to discuss this? Please let me know your availability.";
+        }
+      }
+
+      // General concise: 1-2 direct sentences without forced corporate wrapping
+      if (isConcise) {
+        return isFriendly
+          ? `Just checking in regarding ${p}—let me know your thoughts when you have a moment!`
+          : `Following up regarding ${p}. Please let me know your thoughts.`;
+      }
+
+      const isUrgent = toneCode === 3;
       const isFormal = toneCode === 4;
 
       let greeting = "Hello,";
@@ -151,14 +189,9 @@ export default {
 
       let signoff = "Best regards,";
       if (toneCode === 1) signoff = "Warmly,";
-      else if (toneCode === 2) signoff = "Thanks,";
       else if (toneCode === 3) signoff = "Regards,";
       else if (toneCode === 4) signoff = "Sincerely,";
       else if (toneCode === 5) signoff = "Cheers,";
-
-      if (lengthCode === 1 || toneCode === 2) {
-        return `${greeting}\n\nI am writing regarding ${p}. Please let me know your thoughts and availability so we can proceed.\n\n${signoff}`;
-      }
 
       if (lengthCode === 2) {
         return `${greeting}\n\nI hope you are having a productive week.\n\nI am reaching out to provide complete context regarding ${p}.\n\nKey Highlights:\n- Overview: Reviewing requirements and deliverables aligned with our target schedule.\n- Key Objective: Ensure all stakeholder questions are addressed proactively.\n- Next Action: Finalize discussion points and schedule a brief sync to confirm next steps.\n\nPlease review at your convenience and let me know if you would like any adjustments.\n\n${signoff}`;
@@ -419,39 +452,48 @@ export default {
           const useNeural = sdk.config?.engine !== "Fast Local WASM";
 
           if (useNeural) {
-            const lengthGuides = {
-              Concise: "Length: Exactly 1 to 2 short sentences. Be brief and to the point. Stop immediately after.",
-              Standard: "Length: 2 to 3 standard paragraphs with greeting and signoff.",
-              Detailed: "Length: Detailed email with context, bullet points, and next steps.",
-            };
+            const isConcise = length === "Concise";
+
+            const systemPrompt = isConcise
+              ? "You draft concise, natural email replies. Write strictly 1 or 2 short sentences responding directly to the user's prompt. Do not add formal greetings, salutations, or sign-offs unless requested. Keep it brief, natural, and friendly. Output only the message text without quotes."
+              : "You draft email messages based on the user's request. Output only the email text in a natural, human voice that matches the requested tone. Avoid stiff corporate jargon.";
 
             const toneGuides = {
-              Professional: "Tone: Professional and courteous.",
-              Friendly: "Tone: Warm, friendly, and appreciative.",
-              Concise: "Tone: Direct, clear, and brief.",
-              Urgent: "Tone: Urgent with immediate call to action.",
-              Formal: "Tone: Formal and respectful.",
-              Casual: "Tone: Casual, relaxed, and conversational.",
+              Professional: "Professional, polite, and clear.",
+              Friendly: "Warm, friendly, appreciative, and conversational. Avoid stiff corporate phrases.",
+              Concise: "Direct, crisp, and to the point.",
+              Urgent: "Prompt and time-sensitive.",
+              Formal: "Formal, respectful, and structured.",
+              Casual: "Casual, relaxed, and conversational.",
             };
+
+            const lengthGuides = {
+              Concise: "Strictly 1 to 2 short sentences.",
+              Standard: "1 to 2 concise paragraphs.",
+              Detailed: "A full structured email with details and next steps.",
+            };
+
+            const userContent = isConcise
+              ? `Message to respond to:\n"${prompt}"\n\nTone: ${toneGuides[tone] || "Conversational"}\nRequirement: Exactly 1 to 2 short sentences. Reply directly:`
+              : `Request:\n"${prompt}"\nTone: ${toneGuides[tone] || "Professional"}\nLength: ${lengthGuides[length] || "Standard"}\nWrite the email:`;
 
             const messages = [
               {
                 role: "system",
-                content:
-                  "You are an assistant that drafts outgoing emails for the user to send. Output only the email text with a greeting, body, and signoff. Never converse with the user. Never repeat sentences or phrases. Stop immediately once the email is complete.",
+                content: systemPrompt,
               },
               {
                 role: "user",
-                content: `Email Objective: ${prompt}\n${toneGuides[tone] || ""}\n${lengthGuides[length] || ""}\nWrite the outgoing email:`,
+                content: userContent,
               },
             ];
 
             const tokenLimits = {
-              Concise: 80,
-              Standard: 300,
-              Detailed: 500,
+              Concise: 45,
+              Standard: 180,
+              Detailed: 400,
             };
-            const maxTokens = tokenLimits[length] || 300;
+            const maxTokens = tokenLimits[length] || 180;
 
             const modelId = sdk.config?.model?.includes("SmolLM2")
               ? "HuggingFaceTB/SmolLM2-135M-Instruct"
@@ -482,8 +524,10 @@ export default {
               progressContainer.style.display = "none";
             }
 
-            // Loop detector: trim if the model ever repeats any sentence or clause
+            // Post-processing: deduplication, clean quotes, and enforce sentence limits
             if (generated) {
+              generated = generated.replace(/^["'`\s]+|["'`\s]+$/g, "").trim();
+
               const rawSentences = generated.match(/[^.!?\n]+[.!?\n]*|\S+$/g) || [generated];
               const seen = new Set();
               const deduped = [];
@@ -498,6 +542,14 @@ export default {
                 deduped.push(s);
               }
               generated = deduped.join(" ");
+
+              // Firm enforcement of length constraint for Concise (at most 2 sentences)
+              if (isConcise) {
+                const sentences = generated.match(/[^.!?\n]+[.!?\n]*/g) || [generated];
+                if (sentences.length > 2) {
+                  generated = sentences.slice(0, 2).join(" ").trim();
+                }
+              }
             }
           }
 

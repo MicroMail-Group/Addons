@@ -71,18 +71,17 @@ fn synthesize_email(prompt: &str, tone_code: u32, length_code: u32) -> String {
     // 4. Extract specific times/dates or topics mentioned
     let time_mention = extract_time_mention(trimmed);
 
+    // If Concise mode (length_code == 1 or tone_code == 2), return strictly 1-2 sentences without forced corporate wrapping
+    if length_code == 1 || tone_code == 2 {
+        return generate_concise(&p_lower, trimmed, intent, time_mention.as_deref());
+    }
+
     // 5. Build body paragraphs
     let mut body = String::new();
     body.push_str(&greeting);
     body.push_str("\n\n");
 
     match (intent, tone_code, length_code) {
-        // Concise Mode (length_code == 1 or tone_code == 2)
-        (_, _, 1) | (_, 2, _) => {
-            let msg = generate_concise(&p_lower, trimmed, intent, time_mention.as_deref());
-            body.push_str(&msg);
-            body.push_str("\n\n");
-        }
         // Detailed Mode (length_code == 2)
         (_, _, 2) => {
             let msg = generate_detailed(&p_lower, trimmed, intent, tone_code, time_mention.as_deref());
@@ -131,7 +130,7 @@ fn detect_intent(prompt: &str) -> EmailIntent {
         EmailIntent::FollowUp
     } else if prompt.contains("decline") || prompt.contains("reject") || prompt.contains("pass on") || prompt.contains("cannot make") || prompt.contains("unable to") {
         EmailIntent::Decline
-    } else if prompt.contains("thank") || prompt.contains("appreciat") || prompt.contains("grateful") {
+    } else if prompt.contains("thank") || prompt.contains("appreciat") || prompt.contains("grateful") || prompt.contains("great") || prompt.contains("good job") || prompt.contains("awesome") || prompt.contains("kudos") {
         EmailIntent::ThankYou
     } else if prompt.contains("status") || prompt.contains("update") || prompt.contains("progress") || prompt.contains("milestone") {
         EmailIntent::StatusUpdate
@@ -186,6 +185,8 @@ fn capitalize(s: &str) -> String {
 fn clean_prompt_core(prompt: &str) -> String {
     let mut s = prompt.trim();
     for prefix in &[
+        "response to this ", "response to ", "respond to this ", "respond to ",
+        "reply to this ", "reply to ",
         "write an email to ", "write an email about ", "write an email ",
         "draft an email to ", "draft an email ", "compose an email ",
         "write to ", "tell them that ", "tell him that ", "tell her that ",
@@ -195,7 +196,7 @@ fn clean_prompt_core(prompt: &str) -> String {
             s = &s[prefix.len()..];
         }
     }
-    s.trim().to_string()
+    s.trim_matches(|c: char| c == '"' || c == '\'' || c.is_whitespace()).to_string()
 }
 
 fn generate_concise(_p_lower: &str, raw: &str, intent: EmailIntent, time: Option<&str>) -> String {
@@ -215,7 +216,14 @@ fn generate_concise(_p_lower: &str, raw: &str, intent: EmailIntent, time: Option
             "Thank you for the opportunity. Unfortunately, I will have to pass at this time. I appreciate your understanding.".to_string()
         }
         EmailIntent::ThankYou => {
-            format!("Thank you for your assistance with {}. It was greatly appreciated!", core)
+            let lower = raw.to_lowercase();
+            if lower.contains("you did great") || lower.contains("great") || lower.contains("good job") {
+                "Thanks so much, really appreciate the kind words!".to_string()
+            } else if lower.contains("thank") {
+                "Thank you so much! Really appreciate your help and support.".to_string()
+            } else {
+                format!("Thank you for your assistance with {}. It was greatly appreciated!", core)
+            }
         }
         EmailIntent::StatusUpdate => {
             format!("Quick update on {}: everything is progressing on schedule. I will share more details soon.", core)
