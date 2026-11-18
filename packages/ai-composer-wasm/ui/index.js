@@ -4,8 +4,6 @@ export default {
 
     let wasmInstance = null;
     let wasmMemory = null;
-    let transformersPipeline = null;
-    let isModelLoading = false;
 
     // 1. Local WASM Module Loader (Fast / Offline)
     async function loadWasm() {
@@ -28,40 +26,59 @@ export default {
     // Preload WASM
     loadWasm();
 
-    // 2. Transformers.js Pipeline Loader (Client Neural Model)
-    async function loadTransformers(onProgress) {
-      if (transformersPipeline) return transformersPipeline;
-      if (isModelLoading) return null;
+    // 2. Background Web Worker Inference Engine (Runs off the main UI thread)
+    let workerInstance = null;
 
+    function getWorker() {
+      if (workerInstance) return workerInstance;
       try {
-        isModelLoading = true;
-        // Dynamically import Transformers.js from CDN
-        const { pipeline, env } = await import(
-          /* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3"
-        );
-
-        env.allowLocalModels = false;
-
-        // Select neural model: Qwen 2.5 0.5B (default) or SmolLM2 135M
-        const modelId = sdk.config?.model?.includes("SmolLM2")
-          ? "HuggingFaceTB/SmolLM2-135M-Instruct"
-          : "onnx-community/Qwen2.5-0.5B-Instruct";
-
-        transformersPipeline = await pipeline("text-generation", modelId, {
-          dtype: "q4",
-          progress_callback: (p) => {
-            if (typeof onProgress === "function" && p.status === "progress") {
-              onProgress(Math.round(p.progress || 0));
-            }
-          },
-        });
-        isModelLoading = false;
-        return transformersPipeline;
+        const workerUrl = sdk.assetUrl("worker.js");
+        workerInstance = new Worker(workerUrl, { type: "module" });
+        return workerInstance;
       } catch (err) {
-        isModelLoading = false;
-        console.warn("[Smart Composer] Transformers.js loading unavailable, using local WASM:", err);
+        console.warn("[Smart Composer] Failed to initialize Web Worker:", err);
         return null;
       }
+    }
+
+    function generateWithWorker(modelId, messages, options, onProgress) {
+      return new Promise((resolve, reject) => {
+        const worker = getWorker();
+        if (!worker) {
+          return reject(new Error("Web Worker unavailable"));
+        }
+
+        const handleMessage = (e) => {
+          const { type, progress, text, error } = e.data;
+          if (type === "progress") {
+            if (typeof onProgress === "function") onProgress(progress);
+          } else if (type === "ready") {
+            worker.postMessage({
+              type: "generate",
+              data: {
+                messages,
+                maxTokens: options.maxTokens,
+                temperature: options.temperature,
+                topP: options.topP,
+                repetitionPenalty: options.repetitionPenalty,
+              },
+            });
+          } else if (type === "done") {
+            worker.removeEventListener("message", handleMessage);
+            resolve(text);
+          } else if (type === "error") {
+            worker.removeEventListener("message", handleMessage);
+            reject(new Error(error));
+          }
+        };
+
+        worker.addEventListener("message", handleMessage);
+
+        worker.postMessage({
+          type: "init",
+          data: { modelId },
+        });
+      });
     }
 
     const TONE_MAP = {
@@ -398,22 +415,10 @@ export default {
           const length = lengthSelect.value;
           let generated = "";
 
-          // Attempt Transformers.js if configured or available
+          // Attempt neural generation in background worker if configured
           const useNeural = sdk.config?.engine !== "Fast Local WASM";
-          let neuralPipe = null;
 
           if (useNeural) {
-            progressContainer.style.display = "block";
-            progressLabel.textContent = "Loading local model...";
-            neuralPipe = await loadTransformers((pct) => {
-              progressLabel.textContent = "Caching local model in browser...";
-              progressVal.textContent = `${pct}%`;
-              progressBar.style.width = `${pct}%`;
-            });
-            progressContainer.style.display = "none";
-          }
-
-          if (neuralPipe) {
             const lengthGuides = {
               Concise: "Length: Exactly 1 to 2 short sentences. Be brief and to the point. Stop immediately after.",
               Standard: "Length: 2 to 3 standard paragraphs with greeting and signoff.",
@@ -448,21 +453,33 @@ export default {
             };
             const maxTokens = tokenLimits[length] || 300;
 
-            const out = await neuralPipe(messages, {
-              max_new_tokens: maxTokens,
-              temperature: 0.5,
-              top_p: 0.9,
-              repetition_penalty: 1.35,
-              do_sample: true,
-            });
+            const modelId = sdk.config?.model?.includes("SmolLM2")
+              ? "HuggingFaceTB/SmolLM2-135M-Instruct"
+              : "onnx-community/Qwen2.5-0.5B-Instruct";
 
-            if (out && out[0] && out[0].generated_text) {
-              const res = out[0].generated_text;
-              if (Array.isArray(res)) {
-                generated = res[res.length - 1].content;
-              } else if (typeof res === "string") {
-                generated = res;
-              }
+            progressContainer.style.display = "block";
+            progressLabel.textContent = "Running in background thread...";
+
+            try {
+              generated = await generateWithWorker(
+                modelId,
+                messages,
+                {
+                  maxTokens,
+                  temperature: 0.5,
+                  topP: 0.9,
+                  repetitionPenalty: 1.35,
+                },
+                (pct) => {
+                  progressLabel.textContent = "Caching local model in browser...";
+                  progressVal.textContent = `${pct}%`;
+                  progressBar.style.width = `${pct}%`;
+                }
+              );
+            } catch (workerErr) {
+              console.warn("[Smart Composer] Worker generation failed, using local WASM:", workerErr);
+            } finally {
+              progressContainer.style.display = "none";
             }
 
             // Loop detector: trim if the model ever repeats any sentence or clause
