@@ -433,26 +433,26 @@ export default {
               {
                 role: "system",
                 content:
-                  "You are a helpful email writing assistant. Write a clean email draft based on the user's instructions. Strictly observe the length constraint. Never repeat sentences or phrases. Once complete, stop immediately.",
+                  "You are an assistant that drafts outgoing emails for the user to send. Output only the email text with a greeting, body, and signoff. Never converse with the user. Never repeat sentences or phrases. Stop immediately once the email is complete.",
               },
               {
                 role: "user",
-                content: `${toneGuides[tone] || ""}\n${lengthGuides[length] || ""}\nDraft an email responding to: ${prompt}`,
+                content: `Email Objective: ${prompt}\n${toneGuides[tone] || ""}\n${lengthGuides[length] || ""}\nWrite the outgoing email:`,
               },
             ];
 
             const tokenLimits = {
-              Concise: 90,
-              Standard: 320,
-              Detailed: 550,
+              Concise: 80,
+              Standard: 300,
+              Detailed: 500,
             };
-            const maxTokens = tokenLimits[length] || 320;
+            const maxTokens = tokenLimits[length] || 300;
 
             const out = await neuralPipe(messages, {
               max_new_tokens: maxTokens,
-              temperature: 0.6,
+              temperature: 0.5,
               top_p: 0.9,
-              repetition_penalty: 1.25,
+              repetition_penalty: 1.35,
               do_sample: true,
             });
 
@@ -465,16 +465,16 @@ export default {
               }
             }
 
-            // Loop detector: trim if the model ever repeats any sentence
+            // Loop detector: trim if the model ever repeats any sentence or clause
             if (generated) {
-              const rawSentences = generated.split(/(?<=[.?!])\s+/);
+              const rawSentences = generated.match(/[^.!?\n]+[.!?\n]*|\S+$/g) || [generated];
               const seen = new Set();
               const deduped = [];
               for (const raw of rawSentences) {
                 const s = raw.trim();
                 if (!s) continue;
                 const normalized = s.toLowerCase().replace(/[^a-z0-9]/g, "");
-                if (seen.has(normalized)) {
+                if (normalized.length > 5 && seen.has(normalized)) {
                   break; // Repetition loop detected, cut off right here
                 }
                 seen.add(normalized);
