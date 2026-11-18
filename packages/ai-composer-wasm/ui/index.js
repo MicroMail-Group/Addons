@@ -454,42 +454,75 @@ export default {
           if (useNeural) {
             const isConcise = length === "Concise";
 
-            const systemPrompt = isConcise
-              ? "You draft concise, natural email replies. Write strictly 1 or 2 short sentences responding directly to the user's prompt. Do not add formal greetings, salutations, or sign-offs unless requested. Keep it brief, natural, and friendly. Output only the message text without quotes."
-              : "You draft email messages based on the user's request. Output only the email text in a natural, human voice that matches the requested tone. Avoid stiff corporate jargon.";
+            // Check if user is asking to reply to an incoming message
+            const replyMatch = prompt.match(
+              /^(?:in\s+)?(?:respond|response|reply|answer)(?:\s+(?:to|back to)(?:\s+this)?)?[:\s]+["'“]?(.+?)["'”]?$/i
+            );
+            const incoming = replyMatch && replyMatch[1].trim()
+              ? replyMatch[1].trim().replace(/^["'“]|["'”]$/g, "").trim()
+              : null;
 
-            const toneGuides = {
-              Professional: "Professional, polite, and clear.",
-              Friendly: "Warm, friendly, appreciative, and conversational. Avoid stiff corporate phrases.",
-              Concise: "Direct, crisp, and to the point.",
-              Urgent: "Prompt and time-sensitive.",
-              Formal: "Formal, respectful, and structured.",
-              Casual: "Casual, relaxed, and conversational.",
-            };
+            const toneDesc = {
+              Professional: "polite and professional",
+              Friendly: "friendly and conversational",
+              Concise: "direct and brief",
+              Urgent: "urgent and time-sensitive",
+              Formal: "formal and respectful",
+              Casual: "casual and relaxed",
+            }[tone] || "natural";
 
-            const lengthGuides = {
-              Concise: "Strictly 1 to 2 short sentences.",
-              Standard: "1 to 2 concise paragraphs.",
-              Detailed: "A full structured email with details and next steps.",
-            };
+            let messages = [];
 
-            const userContent = isConcise
-              ? `Message to respond to:\n"${prompt}"\n\nTone: ${toneGuides[tone] || "Conversational"}\nRequirement: Exactly 1 to 2 short sentences. Reply directly:`
-              : `Request:\n"${prompt}"\nTone: ${toneGuides[tone] || "Professional"}\nLength: ${lengthGuides[length] || "Standard"}\nWrite the email:`;
-
-            const messages = [
-              {
-                role: "system",
-                content: systemPrompt,
-              },
-              {
-                role: "user",
-                content: userContent,
-              },
-            ];
+            if (incoming) {
+              messages = [
+                {
+                  role: "system",
+                  content: isConcise
+                    ? "You draft concise email replies. Write strictly 1 or 2 short sentences directly answering what the sender said. Never use placeholder brackets like [Recipient] or [Name]. Never invent fictional topics or achievements. Output only the reply text."
+                    : "You draft email replies. Write in a natural human voice matching the requested tone. Never use placeholder brackets like [Recipient] or [Name]. Output only the reply text.",
+                },
+                {
+                  role: "user",
+                  content:
+                    'The sender wrote to you:\n"Thanks for sending over the report so quickly."\n\nWrite a short friendly reply back to them:',
+                },
+                {
+                  role: "assistant",
+                  content:
+                    "Happy to help! Let me know if you need any additional information on it.",
+                },
+                {
+                  role: "user",
+                  content: `The sender wrote to you:\n"${incoming}"\n\nWrite a ${isConcise ? "short 1 to 2 sentence " : ""}${toneDesc} reply back to them:`,
+                },
+              ];
+            } else {
+              messages = [
+                {
+                  role: "system",
+                  content: isConcise
+                    ? "You draft concise email messages. Write strictly 1 or 2 short sentences based on the user's task. Never use placeholder brackets like [Recipient] or [Name]. Never invent fictional topics or achievements. Output only the email text."
+                    : "You draft email messages based strictly on the user's task. Write in a natural human voice matching the requested tone. Never use placeholder brackets like [Name] or [Recipient]. Avoid generic corporate jargon. Output only the email text.",
+                },
+                {
+                  role: "user",
+                  content:
+                    "Task: ask Sarah for the latest project budget\n\nWrite a short friendly email message:",
+                },
+                {
+                  role: "assistant",
+                  content:
+                    "Hi Sarah, do you have a moment to share the latest project budget when you get a chance? Thanks!",
+                },
+                {
+                  role: "user",
+                  content: `Task: ${prompt}\n\nWrite a ${isConcise ? "short 1 to 2 sentence " : ""}${toneDesc} email message:`,
+                },
+              ];
+            }
 
             const tokenLimits = {
-              Concise: 45,
+              Concise: 50,
               Standard: 180,
               Detailed: 400,
             };
@@ -524,8 +557,10 @@ export default {
               progressContainer.style.display = "none";
             }
 
-            // Post-processing: deduplication, clean quotes, and enforce sentence limits
+            // Post-processing: deduplication, clean placeholders, clean quotes, and enforce sentence limits
             if (generated) {
+              generated = generated.replace(/\[\s*(?:Recipient|Name|Your Name|Sender|Colleague|Insert [^\]]+)\s*\]/gi, "").trim();
+              generated = generated.replace(/^(?:Hi|Hello|Dear|Hey)\s*,\s*/i, "").trim();
               generated = generated.replace(/^["'`\s]+|["'`\s]+$/g, "").trim();
 
               const rawSentences = generated.match(/[^.!?\n]+[.!?\n]*|\S+$/g) || [generated];
