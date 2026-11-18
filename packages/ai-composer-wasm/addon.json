@@ -1,7 +1,7 @@
 {
   "id": "official.ai-composer",
   "name": "Smart Email Composer (Local Transformers & WASM)",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "runtime": "frontend",
   "description": "Compose and polish emails using client-side Transformers.js neural models and lightweight WASM running 100% in your browser.",
   "permissions": [
